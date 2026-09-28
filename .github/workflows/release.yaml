@@ -1,0 +1,67 @@
+name: '🚀 Release Plugin'
+
+# Push a tag like v1.0.0 (or run it manually with a version) to build the plugin,
+# attach the zip to a GitHub release and add the version to manifest.json
+# (the Jellyfin plugin repository).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 1.0.0 (a tag v<version> is created on master)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'master' || github.ref }}
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Compute version
+        id: v
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then tag="v${{ inputs.version }}"; else tag="$GITHUB_REF_NAME"; fi
+          tag="v${tag#v}"
+          echo "TAG=$tag" >> "$GITHUB_ENV"
+          v="${tag#v}"
+          while [ "$(echo "$v" | tr -cd . | wc -c)" -lt 3 ]; do v="$v.0"; done
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: |
+          dotnet publish Jellyfin.Plugin.KeepMyPlaylists/Jellyfin.Plugin.KeepMyPlaylists.csproj -c Release -o out \
+            -p:Version=${{ steps.v.outputs.version }} \
+            -p:AssemblyVersion=${{ steps.v.outputs.version }} \
+            -p:FileVersion=${{ steps.v.outputs.version }}
+          zip -j "keep-my-playlists_${{ steps.v.outputs.version }}.zip" out/Jellyfin.Plugin.KeepMyPlaylists.dll
+          echo "MD5=$(md5sum keep-my-playlists_*.zip | cut -d' ' -f1)" >> "$GITHUB_ENV"
+          git fetch origin master
+          git checkout master
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$TAG" keep-my-playlists_*.zip --target "$(git rev-parse HEAD)" --title "Keep My Playlists ${{ steps.v.outputs.version }}" --generate-notes
+
+      - name: Update manifest.json
+        run: |
+          url="https://github.com/${{ github.repository }}/releases/download/${TAG}/keep-my-playlists_${{ steps.v.outputs.version }}.zip"
+          python3 .github/scripts/update_manifest.py "${{ steps.v.outputs.version }}" "$url" "$MD5"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: release ${{ steps.v.outputs.version }}"
+          git push origin master
