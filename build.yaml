@@ -1,16 +1,17 @@
 ---
-name: "Template"
-guid: "eb5d7894-8eef-4b36-aa6f-5d124e828ce1"
+name: "Keep My Playlists"
+guid: "50558b42-cf75-4263-880f-7bd2e766907c"
 version: "1.0.0.0"
-targetAbi: "10.11.0.0"
-framework: "net9.0"
-overview: "Short description about your plugin"
+targetAbi: "12.1.0.0"
+framework: "net10.0"
+overview: "Keep playlist entries and their order when a movie or episode is replaced"
 description: >
-  This is a longer description that can span more than one
-  line and include details about your plugin.
+  When Radarr/Sonarr upgrades a file or a file is swapped by hand, Jellyfin
+  drops it from every playlist. This plugin puts the new version back at the
+  same position.
 category: "General"
-owner: "jellyfin"
+owner: "samxel"
 artifacts:
-- "Jellyfin.Plugin.Template.dll"
+- "Jellyfin.Plugin.KeepMyPlaylists.dll"
 changelog: >
-  changelog
+  Initial release.
